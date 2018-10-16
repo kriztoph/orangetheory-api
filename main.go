@@ -142,7 +142,16 @@ func main() {
 			return
 		}
 
-		bookClass(classToSchedule.InstanceID, request["site"].(string), phpSessionID)
+		result, err := bookClass(classToSchedule.InstanceID, request["site"].(string), phpSessionID)
+		if err != nil {
+			c.JSON(500, gin.H{
+				"error": err.Error(),
+			})
+
+			return
+		}
+
+		c.JSON(200, result)
 	})
 
 	r.GET("/schedule/:site", func(c *gin.Context) {
@@ -385,7 +394,11 @@ func request(date time.Time, site string, phpSessionID string) (ScheduleResponse
 	}, nil
 }
 
-func bookClass(instanceID string, site string, phpSessionID string) error {
+type bookResult struct {
+	Status string `json:"status"`
+}
+
+func bookClass(instanceID string, site string, phpSessionID string) (result *bookResult, err error) {
 	// book class (POST https://brentwood-norcal.orangetheoryfitness.com/apps/mindbody/signup_ajax.php)
 
 	params := url.Values{}
@@ -423,7 +436,7 @@ func bookClass(instanceID string, site string, phpSessionID string) error {
 	// Create request
 	req, err := http.NewRequest("POST", "https://" + site + ".orangetheoryfitness.com/apps/mindbody/signup_ajax.php", body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// Headers
 	req.Header.Add("Cookie", "PHPSESSID=" + phpSessionID)
@@ -434,7 +447,7 @@ func bookClass(instanceID string, site string, phpSessionID string) error {
 	resp, err := client.Do(req)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Read Response Body
@@ -445,5 +458,10 @@ func bookClass(instanceID string, site string, phpSessionID string) error {
 	fmt.Println("response Headers : ", resp.Header)
 	fmt.Println("response Body : ", string(respBody))
 
-	return nil
+	err = json.Unmarshal(respBody, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
